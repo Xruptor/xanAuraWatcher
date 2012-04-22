@@ -622,14 +622,11 @@ function f:doFullScan(eventType)
 end
 
 --sometimes SPELL_CAST_SUCCESS gets sent but the SPELL_AURA_APPLIED doesn't get transmitted
---When this happens usually UnitAura will return incorrect data.  Therefore we are going to trigger a update after SPELL_CAST_SUCCESS just in case!
+--When this happens usually UnitAura will return incorrect data.  Therefore we are going to trigger a update after SPELL_CAST_SUCCESS, SPELL_AURA_APPLIED, SPELL_AURA_REFRESH just in case!
 f:SetScript("OnUpdate", function(self, elapsed)
-	if doUpdate then
-		if not self.timer then self.timer = 0 end
-		self.timer = self.timer + elapsed
-		if self.timer > 0.4 then
-			doUpdate = false
-			self.timer = 0
+	if self.timer and self.timer > 0 then
+		self.timer = self.timer - elapsed
+		if self.timer <= 0 then
 			self:doFullScan("SPELL_CAST_SUCCESS")
 		end
 	end
@@ -673,16 +670,21 @@ function f:doScanUpdate(spellID, spellName, dstGUID, destName, eventType)
 		lastCastID = nil
 	end
 
-	if eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REFRESH" then
+	if hasCasted and eventType ~= "SPELL_CAST_SUCCESS" then
 		hasCasted = false
 		lastCastTarget = nil
 		lastCastID = nil
 	end
-	
-	if eventType == "SPELL_CAST_SUCCESS" then doUpdate = true end --this is for slight combatlog delay
 
-	--refresh
+	--trigger a refresh
 	f:doFullScan(eventType)
+	
+	--this is for slight combatlog delay
+	if eventType == "SPELL_CAST_SUCCESS" or eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REFRESH" then
+		--trigger the timer
+		f.timer = 0.5
+	end
+	
 end
 
 if IsLoggedIn() then f:PLAYER_LOGIN() else f:RegisterEvent("PLAYER_LOGIN") end
