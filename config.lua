@@ -35,11 +35,39 @@ Addon.auraList = {
 			warnTextColor = { 0.15, 0.49, 1 },
 		},
 	},
-	-- ["MAGE"]	= { 
-		-- [30482] = 1, --molten armor
-		-- [7302] = 2, --frost armor
-		-- [6117] = 3, --mage armor
-	-- },
+	["PALADIN"]	= {
+		[1] = { --beacon of light
+			spellID = 53563,
+			canCastOther = true,
+			showTargetName = true,
+			alertSound = "Sound\\Doodad\\BellTollHorde.wav",
+			useRaidWarn = true,
+			useChatWarn = true,
+		},
+	},
+	["MAGE"] = {
+		[1] = { --molten armor
+			spellID = 30482,
+			canCastOther = false,
+			alertSound = "Sound\\Doodad\\G_GongTroll01.wav",
+			useRaidWarn = true,
+			useChatWarn = true,
+		},
+		[2] = { --frost armor
+			spellID = 7302,
+			canCastOther = false,
+			alertSound = "Sound\\Doodad\\G_GongTroll01.wav",
+			useRaidWarn = true,
+			useChatWarn = true,
+		},
+		[3] = { --mage armor
+			spellID = 6117,
+			canCastOther = false,
+			alertSound = "Sound\\Doodad\\G_GongTroll01.wav",
+			useRaidWarn = true,
+			useChatWarn = true,
+		},
+	},
 }
 
 local playerClass = select(2, UnitClass("player"))

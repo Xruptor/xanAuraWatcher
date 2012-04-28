@@ -11,6 +11,7 @@ local spellNameList = {}
 local lastCastTarget
 local lastCastID
 local hasCasted
+local lastPlayerTime = GetTime()
 local doUpdate = false
 
 local auraList = Addon.auraList[playerClass]
@@ -46,6 +47,7 @@ function f:PLAYER_LOGIN()
 
 	if not XanAW_DB then XanAW_DB = {} end
 	if XanAW_DB.size == nil then XanAW_DB.size = 35 end
+	if XanAW_DB.enable == nil then XanAW_DB.enable = true end
 
 	self:CreateAnchor("XAW_Anchor", UIParent, "xanAuraWatcher Anchor")
 	self:CreateFrames()
@@ -101,6 +103,17 @@ function xanAW_SlashCommand(cmd)
 			XAW_Anchor:ClearAllPoints()
 			XAW_Anchor:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 			return true
+		elseif c and c:lower() == "enable" then
+			if XanAW_DB.enable then
+				XanAW_DB.enable = false
+				xanAuraWatcher:disableAddon()
+				DEFAULT_CHAT_FRAME:AddMessage("xanAuraWatcher: addon disabled!");
+			else
+				XanAW_DB.enable = true
+				xanAuraWatcher:doFullScan("PLAYER_LOGIN")
+				DEFAULT_CHAT_FRAME:AddMessage("xanAuraWatcher: addon enabled!");
+			end
+			return true
 		elseif c and c:lower() == "size" then
 			if b then
 				local sizenum = strsub(cmd, b+2)
@@ -115,6 +128,7 @@ function xanAW_SlashCommand(cmd)
 
 	DEFAULT_CHAT_FRAME:AddMessage("xanAuraWatcher");
 	DEFAULT_CHAT_FRAME:AddMessage("/xanaw reset - resets the frame position");
+	DEFAULT_CHAT_FRAME:AddMessage("/xanaw enable - toggles on/off the addon for current player");
 	DEFAULT_CHAT_FRAME:AddMessage("/xanaw lock - toggles locked frame");
 	DEFAULT_CHAT_FRAME:AddMessage("/xanaw size # - Set the size of the xanAuraWatcher icons")
 end
@@ -415,22 +429,25 @@ local function rgbhex(r, g, b)
 end
 
 function f:COMBAT_LOG_EVENT_UNFILTERED(event, timestamp, eventType, hideCaster, sourceGUID, sourceName, srcFlags, sourceRaidFlags, dstGUID, destName, destFlags, destRaidFlags, spellID, spellName, spellSchool, auraType, amount)
+	if not XanAW_DB.enable then return end
 
 	if eventSwitch[eventType] and band(srcFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0 then
 		if spellID and iconSpellList[spellID] then
 			--print(eventType, sourceGUID, sourceName, destName, dstGUID, spellID, spellName, auraType, amount, band(srcFlags, COMBATLOG_OBJECT_AFFILIATION_MINE))
-			f:doScanUpdate(spellID, spellName, dstGUID, destName, eventType)
+			f:doScanUpdate(spellID, spellName, dstGUID, destName, sourceGUID, sourceName, eventType)
 		end 
     end
 end
 
 --this function is used to track what was cast and when, to prevent alerts from refresh auras and replacement aura on different targets
 function f:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
+	if not XanAW_DB.enable then return end
 	if unit ~= "player" then return end
 	if not spellNameList[spell] then return end
 	--we use this to track refreshes or newly casted overwrites
 	hasCasted = true
 	lastCastID = spellNameList[spell]
+	lastPlayerTime = GetTime()
 	if target and string.len(target) > 0 then
 		lastCastTarget = target:match("^([^-]+)")
 	else
@@ -439,21 +456,21 @@ function f:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
 end
 
 function f:doFullScan(eventType)
+	if not XanAW_DB.enable then return end
 	--print('doFullScan',eventType)
 	
 	for i=1, #auraList do
 	
 		local valChk = auraList[i]
 		local hasShown = false
-		local spellname, auraname, charges, caster, unitName
+		local spellname, auraname, charges, caster, unitName = GetSpellInfo(valChk.spellID)
 		
-		spellname  = GetSpellInfo(valChk.spellID)
-	
 		if spellname and _G["xanAW"..i] then
 		
 			--lets do the player first
 			unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 			auraname, _, _, charges, _, _, _, caster = UnitAura("player", spellname)
+			if charges and charges < 1 then charges = nil end
 			if auraname and caster == "player" then
 				_G["xanAW"..i]:SetAlpha(1)
 				_G["xanAW"..i.."Count"]:SetText(charges)
@@ -479,7 +496,8 @@ function f:doFullScan(eventType)
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("raid"..q) and UnitName("raid"..q):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("raid"..q, spellname)
-
+					if charges and charges < 1 then charges = nil end
+					
 					if auraname and unitName ~= playerName and caster == "player" then
 						_G["xanAW"..i]:SetAlpha(1)
 						_G["xanAW"..i.."Count"]:SetText(charges)
@@ -504,6 +522,7 @@ function f:doFullScan(eventType)
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("raid"..q.."pet") and UnitName("raid"..q.."pet"):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("raid"..q.."pet", spellname)
+					if charges and charges < 1 then charges = nil end
 					
 					if auraname and unitName ~= playerName and caster == "player" then
 						_G["xanAW"..i]:SetAlpha(1)
@@ -532,7 +551,8 @@ function f:doFullScan(eventType)
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("party"..q) and UnitName("party"..q):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("party"..q, spellname)
-
+					if charges and charges < 1 then charges = nil end
+					
 					if auraname and unitName ~= playerName and caster == "player" then
 						_G["xanAW"..i]:SetAlpha(1)
 						_G["xanAW"..i.."Count"]:SetText(charges)
@@ -557,6 +577,7 @@ function f:doFullScan(eventType)
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("party"..q.."pet") and UnitName("party"..q.."pet"):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("party"..q.."pet", spellname)
+					if charges and charges < 1 then charges = nil end
 					
 					if auraname and unitName ~= playerName and caster == "player" then
 						_G["xanAW"..i]:SetAlpha(1)
@@ -586,6 +607,8 @@ function f:doFullScan(eventType)
 				unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 				auraname, _, _, charges, _, _, _, caster = UnitAura("target", spellname)
 				unitName = UnitName("target") and UnitName("target"):match("^([^-]+)")
+				if charges and charges < 1 then charges = nil end
+				
 				if auraname and unitName and caster == "player" then
 					_G["xanAW"..i]:SetAlpha(1)
 					_G["xanAW"..i.."Count"]:SetText(charges)
@@ -621,6 +644,19 @@ function f:doFullScan(eventType)
 	
 end
 
+function f:disableAddon()
+	--print('disable')
+	for i=1, #auraList do
+		local valChk = auraList[i]
+		local spellname, auraname, charges, caster, unitName = GetSpellInfo(valChk.spellID)
+
+		if spellname and _G["xanAW"..i] then
+			_G["xanAW"..i]:SetAlpha(0)
+		end
+	end
+	
+end
+
 --sometimes SPELL_CAST_SUCCESS gets sent but the SPELL_AURA_APPLIED doesn't get transmitted
 --When this happens usually UnitAura will return incorrect data.  Therefore we are going to trigger a update after SPELL_CAST_SUCCESS, SPELL_AURA_APPLIED, SPELL_AURA_REFRESH just in case!
 f:SetScript("OnUpdate", function(self, elapsed)
@@ -632,19 +668,35 @@ f:SetScript("OnUpdate", function(self, elapsed)
 	end
 end)
 
-function f:doScanUpdate(spellID, spellName, dstGUID, destName, eventType)
-
+function f:doScanUpdate(spellID, spellName, dstGUID, destName, sourceGUID, sourceName, eventType)
+	if not XanAW_DB.enable then return end
+	
 	--check for refreshes or overwrites
 	if eventType == "SPELL_AURA_REMOVED" then
 		--check for previous casts, usually means one was removed to replace another.  In which case we want to ignore the replaced to prevent alert sound
 		local nameChk = destName and destName:match("^([^-]+)")
+		local nameChkSrc = sourceName and sourceName:match("^([^-]+)")
 		local valChk = auraList[iconSpellList[spellID]]
 		local text, color
+		local passChk = false
 		
 		if valChk and valChk.alertSound and _G["xanAW"..iconSpellList[spellID]] then
-			if lastCastID ~= spellID and nameChk ~= lastCastTarget and _G["xanAW"..iconSpellList[spellID]].targetN == nameChk then
+			
+			if dstGUID == playerGUID and sourceGUID == playerGUID then
+				--there will be situations where a spell is being removed from us while we cast something else on us, example switching shields.
+				--when this happens it's sorta hard to track that due to current api.  So we will instead check for an incoming SPELL_CAST_SUCCESS
+				--if the difference between the last SPELL_AURA_REMOVED and UNIT_SPELLCAST_SENT is less then 1, that means it was done literally at the same moment.
+				--which means we switched shields because one was removed while the other was applied
+				if (GetTime() - lastPlayerTime) >= 1 then
+					passChk = true
+				end
+			elseif lastCastID ~= spellID and nameChk ~= lastCastTarget and _G["xanAW"..iconSpellList[spellID]].targetN == nameChk then
 				--we just recently casted something but the spell being removed isn't the one we just casted, so double check and then play sound
 				--and the destination target isn't our last target
+				passChk = true
+			end
+			
+			if passChk then
 				PlaySoundFile(valChk.alertSound, "Master")
 				
 				--do alert text notifications
@@ -662,8 +714,8 @@ function f:doScanUpdate(spellID, spellName, dstGUID, destName, eventType)
 				if valChk.useChatWarn and text then
 					DEFAULT_CHAT_FRAME:AddMessage(rgbhex(unpack(color))..text.."|r")
 				end
-				
 			end
+			
 		end
 		hasCasted = false
 		lastCastTarget = nil
