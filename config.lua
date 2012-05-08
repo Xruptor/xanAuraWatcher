@@ -29,7 +29,7 @@ Addon.auraList = {
 			canCastOther = false,
 			alertSound = "Sound\\Doodad\\BellTollAlliance.wav",
 			alertChargeNum = 1,
-			referrID = {26364},
+			referrID = {26364, 88765}, --88765=rolling thudner
 			useRaidWarn = true,
 			useChatWarn = true,
 			warnTextColor = { 0.15, 0.49, 1 },
