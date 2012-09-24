@@ -443,7 +443,13 @@ end
 function f:UNIT_SPELLCAST_SENT(event, unit, spell, rank, target)
 	if not XanAW_DB.enable then return end
 	if unit ~= "player" then return end
-	if not spellNameList[spell] then return end
+	if not spellNameList[spell] then
+		--spell not on list so reset everything so that spell removal can be triggered because of lastCastTarget
+		hasCasted = true
+		lastCastID = nil
+		lastCastTarget = nil
+		return
+	end
 	--we use this to track refreshes or newly casted overwrites
 	hasCasted = true
 	lastCastID = spellNameList[spell]
@@ -491,8 +497,8 @@ function f:doFullScan(eventType)
 			end
 			
 			--time to check the raid!
-			if not hasShown and valChk.canCastOther and GetNumRaidMembers() > 0 then
-				for q = 1, GetNumRaidMembers() do
+			if not hasShown and valChk.canCastOther and GetNumGroupMembers() > 0 then
+				for q = 1, GetNumGroupMembers() do
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("raid"..q) and UnitName("raid"..q):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("raid"..q, spellname)
@@ -546,8 +552,8 @@ function f:doFullScan(eventType)
 				end
 				
 			--otherwise lets check the party
-			elseif not hasShown and valChk.canCastOther and GetNumPartyMembers() > 0 then
-				for q = 1, GetNumPartyMembers() do
+			elseif not hasShown and valChk.canCastOther and GetNumGroupMembers() > 0 then
+				for q = 1, GetNumGroupMembers() do
 					unitName, auraname, charges, caster = nil, nil, nil, nil --just in case
 					unitName = UnitName("party"..q) and UnitName("party"..q):match("^([^-]+)")
 					auraname, _, _, charges, _, _, _, caster = UnitAura("party"..q, spellname)
@@ -680,7 +686,7 @@ function f:doScanUpdate(spellID, spellName, dstGUID, destName, sourceGUID, sourc
 		local text, color
 		local passChk = false
 		
-		if valChk and valChk.alertSound and _G["xanAW"..iconSpellList[spellID]] then
+		if nameChk and valChk and valChk.alertSound and _G["xanAW"..iconSpellList[spellID]] then
 			
 			if dstGUID == playerGUID and sourceGUID == playerGUID then
 				--there will be situations where a spell is being removed from us while we cast something else on us, example switching shields.
@@ -690,7 +696,7 @@ function f:doScanUpdate(spellID, spellName, dstGUID, destName, sourceGUID, sourc
 				if (GetTime() - lastPlayerTime) >= 1 then
 					passChk = true
 				end
-			elseif lastCastID ~= spellID and nameChk ~= lastCastTarget and _G["xanAW"..iconSpellList[spellID]].targetN == nameChk then
+			elseif spellID ~= lastCastID and nameChk ~= lastCastTarget and _G["xanAW"..iconSpellList[spellID]].targetN == nameChk then
 				--we just recently casted something but the spell being removed isn't the one we just casted, so double check and then play sound
 				--and the destination target isn't our last target
 				passChk = true
